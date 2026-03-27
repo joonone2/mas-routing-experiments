@@ -10,7 +10,7 @@ from sklearn.model_selection import StratifiedKFold
 csv_file_path = "math_poc_results.csv"
 df = pd.read_csv(csv_file_path)
 
-print("임베딩을 추출하는 중입니다... (API 통신 없음, 로컬 연산)")
+print("임베딩을 추출하는 중입니다...")
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
 # 2. 문제(Q)와 초안(Draft)을 각각 독립적으로 임베딩
