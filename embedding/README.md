@@ -19,10 +19,20 @@ k-fold 교차검증으로 실험(k=5)
 [Track C] Vector Difference: 문제 벡터에서 초안 벡터를 단순 요소별 뺄셈. (문제에서 해결 계획을 뺀 나머지 추상적인 특성"이나 "변환 과정"에 난이도 정보가 있는지 확인)  
 
 
-**결과**  
+**결과**
+
+**MiniLM-L6-v2 모델 사용**
 
 📊 [대조군] 원본 문제(Q) 단독: 63.50%  
-------------------------------------------------------------  
 📊 [Track A] Draft 단독: 65.50%  
 📊 [Track B] Late Fusion (Q + Draft 결합): 64.50%  
 📊 [Track C] Vector Difference (Q - Draft): 61.00%  
+
+**bge-large-en-v1.5 모델 사용**
+
+📊 [대조군] 원본 문제(Q) 단독: 66.00%  
+📊 [Track A] Draft 단독: 65.50%  
+📊 [Track B] Late Fusion (Q + Draft 결합): 67.50%  
+📊 [Track C] Vector Difference (Q - Draft): 60.00%  
+
+**추이는 비슷한듯**
