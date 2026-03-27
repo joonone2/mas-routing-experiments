@@ -1,4 +1,7 @@
+# 자연어단에서 Query+Embedding 후 임베딩 
+
 import os
+from dotenv import load_dotenv
 import time
 import pandas as pd
 import numpy as np
@@ -13,10 +16,20 @@ from sklearn.model_selection import train_test_split
 # ==========================================
 # 1. API 셋팅 및 프롬프트 설정 (Gemini 2.0 Flash)
 # ==========================================
-os.environ["GEMINI_API_KEY"] = "AIzaSyAs9WFnqXVMVQrA_MANMNG_bva_u0kKdlk" 
-genai.configure(api_key=os.environ["GEMINI_API_KEY"])
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# evaluate_embedding.py가 embedding 폴더 안에 있다면 '..'으로 루트 이동
+env_path = os.path.join(current_dir, '..', '.env')
 
-model = genai.GenerativeModel('gemini-2.0-flash')
+load_dotenv(dotenv_path=env_path)
+
+# ✅ 변수 할당 추가
+api_key = os.getenv("GEMINI_API_KEY")
+
+if not api_key:
+    raise ValueError(f"API 키를 찾을 수 없습니다. 경로를 확인하세요: {os.path.abspath(env_path)}")
+
+# ✅ API 키 설정 후 모델 초기화
+genai.configure(api_key=api_key)
 
 model_config = genai.types.GenerationConfig(
     temperature=0.0,
@@ -24,6 +37,10 @@ model_config = genai.types.GenerationConfig(
     max_output_tokens=200, 
 )
 
+model = genai.GenerativeModel(
+    model_name='gemini-2.0-flash',
+    generation_config=model_config
+)
 SYSTEM_PROMPT = """System Prompt:
         You are an expert mathematical strategist. Your task is to provide a high-level logical plan to solve the given math problem.
 
@@ -47,7 +64,7 @@ SYSTEM_PROMPT = """System Prompt:
 
 def get_draft_from_gemini(question: str) -> str:
     try:
-        # 유저님이 설정한 {query} 자리에 실제 문제를 쏙 집어넣습니다.
+        # Query 설정 
         full_prompt = SYSTEM_PROMPT.format(query=question)
         response = model.generate_content(full_prompt,
                                             generation_config=model_config)       
@@ -57,13 +74,11 @@ def get_draft_from_gemini(question: str) -> str:
         return "Error occurred."
 
 # ==========================================
-# 2. 파이썬 코드로 실제 MATH 벤치마크 불러오기 (HuggingFace)
+# 2. MATH 벤치마크 불러오기 
 # ==========================================
 print("\n[HuggingFace] MATH 데이터셋을 다운로드 중입니다 (첫 실행 시 몇 분 걸릴 수 있음)...")
 
 try:
-    # 'hendrycks/competition_math' 대신 더 안정적인 'lighteval/MATH' 경로를 시도합니다.
-    # 세부 설정인 'all'을 추가해 모든 문제를 가져옵니다.
     dataset = load_dataset('lighteval/MATH', 'all', split='train')
 except Exception as e:
     print(f"\n[데이터셋 로드 오류]: {e}")
@@ -75,7 +90,6 @@ except Exception as e:
 df_math = dataset.to_pandas()
 
 # 레벨별로 100문제씩 총 200문제 추출 
-# (비용/시간 여유가 되시면 500개씩 추출하시면 논문급 데이터가 됩니다!)
 df_level2 = df_math[df_math['level'] == 'Level 2'].head(100) 
 df_level4 = df_math[df_math['level'] == 'Level 4'].head(100)
 
@@ -105,7 +119,7 @@ X2_texts = [f"Question: {row['problem']}\nDraft: {row['draft']}" for _, row in d
 X2_embeddings = embedder.encode(X2_texts) # (200, 384)
 
 # ==========================================
-# 4. PyTorch 단순 Linear 분류기 (Train / Test 완벽 분리!)
+# 4. PyTorch 단순 Linear 분류기
 # ==========================================
 print("\n[ PyTorch Linear 분류기 훈련 및 *일반화 성능(Test)* 비교 ]")
 
@@ -141,7 +155,7 @@ def train_and_eval_linear_with_split(X_numpy_array, y_numpy_array, epochs=150):
         test_predictions = (model(X_te) >= 0.5).float()
         test_accuracy = (test_predictions == y_te).float().mean().item()
         
-        # ⭐ 핵심 추가: 학습된 모델로 전체 200개 데이터에 대한 예측 라벨 쫙 뽑기
+        # 학습된 모델로 전체 200개 데이터에 대한 예측 라벨 뽑기
         X_all = torch.tensor(X_numpy_array, dtype=torch.float32).to(device)
         all_predictions = (model(X_all) >= 0.5).int().cpu().numpy().flatten()
         
@@ -160,7 +174,7 @@ print(f"📊 [대조군] 단순 문제(Q) Linear 'Test 일반화' 정확도: {ac
 print(f"📊 [실험군] 문제+초안(Q+Draft) Linear 'Test 일반화' 정확도: {acc2*100:.2f}%")
 print("="*60)
 
-# 이대로 저장하면 CSV에 예측값 2개가 예쁘게 박힘
+
 df.to_csv("math_poc_results.csv", index=False, encoding='utf-8-sig')
 
 # 결과 도출
